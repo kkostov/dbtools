@@ -35,9 +35,9 @@ function PrintInfo() {
 
 function GetDbScript()
 {
-if($version -eq "") {
- throw "The version argument is mandatory when importing a database schema"
-}
+    if($version -eq "") {
+     throw "The version argument is mandatory when importing a database schema"
+    }
 
   PrintInfo
   [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.SMO") | Out-Null
@@ -229,7 +229,7 @@ if($version -eq "") {
 
     #prepare the output folder
     $scriptpath = GeVersionFolder
-    $dacFilePath = "$scriptpath\$dbname.dacpac"
+    $dacFilePath = "$scriptpath\$dbname.dacpac".Trim()
     # Run sqlpackage to extract DACPAC
     If ($last_version -gt 0) {
       $msg = "SqlPackage version: " + $last_version + ", using DAC file $dacFilePath";
@@ -237,9 +237,9 @@ if($version -eq "") {
       # Set the extraction path
       $file_name = "C:\Program Files (x86)\Microsoft SQL Server\" + $last_version + "\DAC\bin\sqlpackage.exe";
       if($userName -eq "" -and $password -eq "") {
-        & $file_name `/Action:Publish /TargetServerName:$serverName /TargetDatabaseName:$dbname /SourceFile:$dacFilePath`
+        & $file_name `/Action:Import /TargetServerName:$serverName /TargetDatabaseName:$dbname /SourceFile:$dacFilePath`
       } else {
-        & $file_name `/Action:Publish /TargetServerName:$serverName /TargetDatabaseName:$dbname /TargetUser:$userName /TargetPassword:$password /SourceFile:$dacFilePath`
+        & $file_name `/Action:Import /TargetServerName:$serverName /TargetDatabaseName:$dbname /TargetUser:$userName /TargetPassword:$password /SourceFile:$dacFilePath`
       }
     }
 }
