@@ -4,6 +4,8 @@
 
 # Prerequisites: Set-ExecutionPolicy -ExecutionPolicy:Unrestricted -Scope:LocalMachine
 
+# The sqlpackage utility must be available on the host running this script (data tools)
+
 Param(
 [string]$serverName, 
 [string]$dbname, 
@@ -22,22 +24,50 @@ function GetExtractionFolder() {
   return $dbextractfolder
 }
 
-function GeVersionFolder() {
-  $foldername = "db_extract_$version"
+function GetRelativeVersionFolder() {
+  $foldername = "snapshots/db_extract_$version"
+  #$dbextractfolder =  $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath("$foldername")
+  return $foldername
+}
+
+function GetFullVersionFolder() {
+  $foldername = GetRelativeVersionFolder
   $dbextractfolder =  $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath("$foldername")
   Write-Host "using path $dbextractfolder"
   return $dbextractfolder
 }
 
 function PrintInfo() {
-    Write-Host "Using database $dbname on server $serverName"
-}
-
-function GetDbScript()
-{
     if($version -eq "") {
      throw "The version argument is mandatory when importing a database schema"
     }
+    Write-Host "connecting to $serverName\$dbname for version: $version"
+}
+
+function GetSqlPackageExePath() {
+    # Find the latest sqlpackage.exe
+    $last_version = 0;
+    for($i = 100; $i -le 190; $i += 10)
+    {
+      $file_name = "C:\Program Files (x86)\Microsoft SQL Server\" + $i + "\DAC\bin\sqlpackage.exe";
+      If (Test-Path $file_name) {
+        $last_version = $i;
+      }
+    }
+
+    if($last_version -eq 0) {
+      throw "The sqlpackage.exe was not found on the local machine. Install SQL Data Tools required to manage DACs."
+    }
+    $file_name = "C:\Program Files (x86)\Microsoft SQL Server\" + $last_version + "\DAC\bin\sqlpackage.exe";
+    return $file_name
+}
+
+
+function GetDbScript()
+{
+  if($version -eq "") {
+   throw "The version argument is mandatory when importing a database schema"
+  }
 
   PrintInfo
   [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.SMO") | Out-Null
@@ -82,7 +112,7 @@ function GetDbScript()
   $scr.Options = $options
 
   # Set the extraction path
-  $scriptpath = GeVersionFolder
+  $scriptpath = GetFullVersionFolder
 
   #=============
   # Tables
@@ -175,77 +205,46 @@ function GetDbScript()
 
 function CreateDbDAC()
 {
-if($version -eq "") {
- throw "The version argument is mandatory when importing a database schema"
-}
-
     PrintInfo
-    # Find the latest sqlpackage.exe
-    $last_version = 0;
-    for($i = 100; $i -le 190; $i += 10)
-    {
-      $file_name = "C:\Program Files (x86)\Microsoft SQL Server\" + $i + "\DAC\bin\sqlpackage.exe";
-      If (Test-Path $file_name) {
-        $last_version = $i;
-      }
-    }
-
     #prepare the output folder
-    $scriptpath = GeVersionFolder
+    $scriptpath = GetFullVersionFolder
     New-Item -ItemType Directory -Force -Path $scriptpath
+    $dacFilePath = "$scriptpath\$dbname.dacpac"
 
-    # Run sqlpackage to extract DACPAC
-    If ($last_version -gt 0) {
-      $msg = "SqlPackage version: " + $last_version;
-      Write-Output $msg;
-      # Set the extraction path
-      $file_name = "C:\Program Files (x86)\Microsoft SQL Server\" + $last_version + "\DAC\bin\sqlpackage.exe";
-      if($userName -eq "" -and $password -eq "") {
-        & $file_name `/Action:Extract /OverwriteFiles:True /SourceServerName:$serverName /SourceDatabaseName:$dbname /TargetFile:$scriptpath\$dbname.dacpac /p:ExtractReferencedServerScopedElements=False`
-      } else {
-        & $file_name `/Action:Extract /OverwriteFiles:True /SourceServerName:$serverName /SourceDatabaseName:$dbname /SourceUser:$userName /SourcePassword:$password /TargetFile:$scriptpath\$dbname.dacpac /p:ExtractReferencedServerScopedElements=False`
-      }
+    $sqlpackageExe = GetSqlPackageExePath
+    # Assign the correct arguments depending if we are using sql server login
+    $args
+    if($userName -eq "" -and $password -eq "") {
+     $args = "/Action:Extract", "/SourceServerName:$serverName", "/SourceDatabaseName:$dbname", "/TargetFile:$dacFilePath", "/p:ExtractReferencedServerScopedElements=False"
+    } else {
+     $args = "/Action:Extract", "/SourceServerName:$serverName", "/SourceDatabaseName:$dbname",  "/SourceUser:$userName", "/SourcePassword:$password", "/TargetFile:$dacFilePath", "/p:ExtractReferencedServerScopedElements=False"
     }
+
+    & $sqlpackageExe $args
 }
 
 function ImportDbFromDAC()
 {
-
-#a version to import must be specified
-if($version -eq "") {
- throw "The version argument is mandatory when importing a database schema"
-}
-
-  PrintInfo
-    # Find the latest sqlpackage.exe
-    $last_version = 0;
-    for($i = 100; $i -le 190; $i += 10)
-    {
-      $file_name = "C:\Program Files (x86)\Microsoft SQL Server\" + $i + "\DAC\bin\sqlpackage.exe";
-      If (Test-Path $file_name) {
-        $last_version = $i;
-      }
-    }
-
+    PrintInfo
     #prepare the output folder
-    $scriptpath = GeVersionFolder
+    $scriptpath = GetRelativeVersionFolder
     $dacFilePath = "$scriptpath\$dbname.dacpac".Trim()
-    # Run sqlpackage to extract DACPAC
-    If ($last_version -gt 0) {
-      $msg = "SqlPackage version: " + $last_version + ", using DAC file $dacFilePath";
-      Write-Output $msg;
-      # Set the extraction path
-      $file_name = "C:\Program Files (x86)\Microsoft SQL Server\" + $last_version + "\DAC\bin\sqlpackage.exe";
-      if($userName -eq "" -and $password -eq "") {
-        & $file_name `/Action:Import /TargetServerName:$serverName /TargetDatabaseName:$dbname /SourceFile:$dacFilePath`
-      } else {
-        & $file_name `/Action:Import /TargetServerName:$serverName /TargetDatabaseName:$dbname /TargetUser:$userName /TargetPassword:$password /SourceFile:$dacFilePath`
-      }
+    # Run sqlpackage to extract DACPAC  
+    $sqlpackageExe = GetSqlPackageExePath
+    # Assign the correct arguments depending if we are using sql server login
+    $args
+    if($userName -eq "" -and $password -eq "") {
+     $args = "/Action:Publish", "/TargetServerName:$serverName", "/TargetDatabaseName:$dbname", "/SourceFile:$dacFilePath"
+    } else {
+     $args = "/Action:Publish", "/TargetServerName:$serverName", "/TargetDatabaseName:$dbname",  "/TargetUser:$userName", "/TargetPassword:$password", "/SourceFile:$dacFilePath"
     }
+
+    & $sqlpackageExe $args
 }
 
 
 switch($action) {
+  "script" { GetDbScript }
   "export" { CreateDbDAC }
   "import" { ImportDbFromDAC }
   default {Write-Host "Invalid action. Please specify if you wish to import or export a database schema"}
