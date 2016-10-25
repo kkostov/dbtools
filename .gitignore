@@ -1,4 +1,5 @@
-db_extract_*
+migrations/
+snapshots/
 flyway-*
 
 ## Ignore Visual Studio temporary files, build results, and
