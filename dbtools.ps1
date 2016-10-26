@@ -269,7 +269,10 @@ function FlyWayAction($flyWayAction)
         & $exec $args
      }
      "baseline" {
-        $args = "-user=$userName", "-password=$password", "-url=jdbc:jtds:sqlserver://$serverName/$dbname", "-locations=filesystem:./migrations", "baseline"
+        $args = "-user=$userName", "-password=$password", "-url=jdbc:jtds:sqlserver://$serverName/$dbname", "-locations=filesystem:./migrations", "-baselineDescription=baseline", "baseline"
+        if($version -ne "") {
+            $args += "-baselineVersion=$version"
+        }
         & $exec $args
      }
      default {throw "Unsupported flyWayAction! '$flyWayAction'"}
