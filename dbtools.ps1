@@ -62,6 +62,12 @@ function GetSqlPackageExePath() {
     return $file_name
 }
 
+function GetFlyWayExePath() {
+    # expecting flyway to be in the current folder
+    # download version from https://flywaydb.org/getstarted/download
+    $file_name = "flyway-4.0.3/flyway.cmd";
+    return $file_name;
+}
 
 function GetDbScript()
 {
@@ -243,9 +249,39 @@ function ImportDbFromDAC()
 }
 
 
+
+function FlyWayAction($flyWayAction)
+{
+  $exec = GetFlyWayExePath
+  if($userName -eq "" -and $password -eq "") {
+    throw "Migrations are not supported using Windows Authentication. Enable SQL Server authentication mode by passing username and a password"
+  }
+
+  if($serverName -eq ".") {
+    #the flyway url doesnt support . so dirty tweaking to localhost if not set explicitly
+    $serverName = "localhost"
+  }
+
+  #flyWayAction: migrate | info
+    switch($flyWayAction) {
+     "info" {
+        $args = "-user=$userName", "-password=$password", "-url=jdbc:jtds:sqlserver://$serverName/$dbname", "-locations=filesystem:./migrations", "info"
+        & $exec $args
+     }
+     "baseline" {
+        $args = "-user=$userName", "-password=$password", "-url=jdbc:jtds:sqlserver://$serverName/$dbname", "-locations=filesystem:./migrations", "baseline"
+        & $exec $args
+     }
+     default {throw "Unsupported flyWayAction! '$flyWayAction'"}
+    }
+}
+
+
 switch($action) {
   "script" { GetDbScript }
   "export" { CreateDbDAC }
   "import" { ImportDbFromDAC }
-  default {Write-Host "Invalid action. Please specify if you wish to import or export a database schema"}
+  "info" { FlyWayAction("info") }
+  "baseline" { FlyWayAction("baseline") }
+  default {throw "Invalid action. Supported options are: script, export, import."}
 }
