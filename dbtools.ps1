@@ -229,7 +229,28 @@ function CreateDbDAC()
     & $sqlpackageExe $args
 }
 
-function ImportDbFromDAC()
+
+function CreateDbBAC()
+{
+    PrintInfo
+    #prepare the output folder
+    $scriptpath = GetFullVersionFolder
+    New-Item -ItemType Directory -Force -Path $scriptpath
+    $dacFilePath = "$scriptpath\$dbname.bacpac"
+
+    $sqlpackageExe = GetSqlPackageExePath
+    # Assign the correct arguments depending if we are using sql server login
+    $args
+    if($userName -eq "" -and $password -eq "") {
+     $args = "/Action:Export", "/SourceServerName:$serverName", "/SourceDatabaseName:$dbname", "/TargetFile:$dacFilePath", "/p:ExtractReferencedServerScopedElements=False"
+    } else {
+     $args = "/Action:Export", "/SourceServerName:$serverName", "/SourceDatabaseName:$dbname",  "/SourceUser:$userName", "/SourcePassword:$password", "/TargetFile:$dacFilePath", "/p:ExtractReferencedServerScopedElements=False"
+    }
+
+    & $sqlpackageExe $args
+}
+
+function PublishDbFromDAC()
 {
     PrintInfo
     #prepare the output folder
@@ -243,6 +264,25 @@ function ImportDbFromDAC()
      $args = "/Action:Publish", "/TargetServerName:$serverName", "/TargetDatabaseName:$dbname", "/SourceFile:$dacFilePath"
     } else {
      $args = "/Action:Publish", "/TargetServerName:$serverName", "/TargetDatabaseName:$dbname",  "/TargetUser:$userName", "/TargetPassword:$password", "/SourceFile:$dacFilePath"
+    }
+
+    & $sqlpackageExe $args
+}
+
+function ImportDbFromDAC()
+{
+    PrintInfo
+    #prepare the output folder
+    $scriptpath = GetRelativeVersionFolder
+    $dacFilePath = "$scriptpath\$dbname.bacpac".Trim()
+    # Run sqlpackage to extract DACPAC  
+    $sqlpackageExe = GetSqlPackageExePath
+    # Assign the correct arguments depending if we are using sql server login
+    $args
+    if($userName -eq "" -and $password -eq "") {
+     $args = "/Action:Import", "/TargetServerName:$serverName", "/TargetDatabaseName:$dbname", "/SourceFile:$dacFilePath"
+    } else {
+     $args = "/Action:Import", "/TargetServerName:$serverName", "/TargetDatabaseName:$dbname",  "/TargetUser:$userName", "/TargetPassword:$password", "/SourceFile:$dacFilePath"
     }
 
     & $sqlpackageExe $args
@@ -297,15 +337,17 @@ function FlyWayAction($flyWayAction)
     }
 }
 
-
 switch($action) {
   "script" { GetDbScript }
-  "export" { CreateDbDAC }
+  "extract" { CreateDbDAC }
+  "export" { CreateDbBAC }
+  "publish" { PublishDbFromDAC }
   "import" { ImportDbFromDAC }
   "info" { FlyWayAction("info") }
   "baseline" { FlyWayAction("baseline") }
   "migrate" { FlyWayAction("migrate") }
   "validate" { FlyWayAction("validate") }
   "repair" { FlyWayAction("repair") }
+  "freeze" { FlyWayAction("baseline") }
   default {throw "Invalid action. Supported options are: script, export, import."}
 }
