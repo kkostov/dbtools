@@ -275,6 +275,24 @@ function FlyWayAction($flyWayAction)
         }
         & $exec $args
      }
+     "migrate" {
+        $args = "-user=$userName", "-password=$password", "-url=jdbc:jtds:sqlserver://$serverName/$dbname", "-locations=filesystem:./migrations", "migrate"
+        if($version -ne "") {
+            $args += "-target=$version"
+        }
+        & $exec $args
+     }
+     "validate" {
+        $args = "-user=$userName", "-password=$password", "-url=jdbc:jtds:sqlserver://$serverName/$dbname", "-locations=filesystem:./migrations", "validate"
+        if($version -ne "") {
+            $args += "-target=$version"
+        }
+        & $exec $args
+     }
+     "repair" {
+        $args = "-user=$userName", "-password=$password", "-url=jdbc:jtds:sqlserver://$serverName/$dbname", "-locations=filesystem:./migrations", "repair"
+        & $exec $args
+     }
      default {throw "Unsupported flyWayAction! '$flyWayAction'"}
     }
 }
@@ -286,5 +304,8 @@ switch($action) {
   "import" { ImportDbFromDAC }
   "info" { FlyWayAction("info") }
   "baseline" { FlyWayAction("baseline") }
+  "migrate" { FlyWayAction("migrate") }
+  "validate" { FlyWayAction("validate") }
+  "repair" { FlyWayAction("repair") }
   default {throw "Invalid action. Supported options are: script, export, import."}
 }
