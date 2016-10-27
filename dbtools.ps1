@@ -1,6 +1,3 @@
-# Usage: -action "export" -version "8.0.0"  -serverName "SERVERNAME" -dbname "DATABASENAME" -userName "USERNAME" -password "PASSWORD"
-# when userName and password are ommited, windows authentication is used
-
 
 # Prerequisites: Set-ExecutionPolicy -ExecutionPolicy:Unrestricted -Scope:LocalMachine
 
@@ -12,30 +9,11 @@ Param(
 [string]$userName, 
 [string]$password,
 [string]$version,
-[string]$action
+[string]$action,
+[string]$snapshotsFolder = './snapshots',
+[string]$migrationsFolder = './migrations'
 )
 
-
-function GetExtractionFolder() {
-  $t = Get-Date -Format "yyyymmddHHMMss"
-  $foldername = "db_extract_$t"
-  $dbextractfolder =  $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath("$foldername")
-  Write-Host "using path $dbextractfolder"
-  return $dbextractfolder
-}
-
-function GetRelativeVersionFolder() {
-  $foldername = "snapshots/db_$version"
-  #$dbextractfolder =  $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath("$foldername")
-  return $foldername
-}
-
-function GetFullVersionFolder() {
-  $foldername = GetRelativeVersionFolder
-  $dbextractfolder =  $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath("$foldername")
-  Write-Host "using path $dbextractfolder"
-  return $dbextractfolder
-}
 
 function PrintInfo() {
     if($version -eq "") {
@@ -213,9 +191,9 @@ function CreateDbDAC()
 {
     PrintInfo
     #prepare the output folder
-    $scriptpath = GetFullVersionFolder
+    $scriptpath = $snapshotsFolder
     New-Item -ItemType Directory -Force -Path $scriptpath
-    $dacFilePath = "$scriptpath\$dbname.dacpac"
+    $dacFilePath = Join-Path $scriptpath "\$dbname-$version.dacpac"
 
     $sqlpackageExe = GetSqlPackageExePath
     # Assign the correct arguments depending if we are using sql server login
@@ -234,8 +212,10 @@ function PublishDbFromDAC()
 {
     PrintInfo
     #prepare the output folder
-    $scriptpath = GetRelativeVersionFolder
-    $dacFilePath = "$scriptpath\$dbname.dacpac".Trim()
+    $scriptpath = $snapshotsFolder
+    New-Item -ItemType Directory -Force -Path $scriptpath
+    $dacFilePath = Join-Path $scriptpath "\$dbname-$version.dacpac"
+
     # Run sqlpackage to extract DACPAC  
     $sqlpackageExe = GetSqlPackageExePath
     # Assign the correct arguments depending if we are using sql server login
@@ -265,32 +245,32 @@ function FlyWayAction($flyWayAction)
   #flyWayAction: migrate | info
     switch($flyWayAction) {
      "info" {
-        $args = "-user=$userName", "-password=$password", "-url=jdbc:jtds:sqlserver://$serverName/$dbname", "-locations=filesystem:./migrations", "info"
+        $args = "-user=$userName", "-password=$password", "-url=jdbc:jtds:sqlserver://$serverName/$dbname", "-locations=filesystem:$migrationsFolder", "info"
         & $exec $args
      }
      "baseline" {
-        $args = "-user=$userName", "-password=$password", "-url=jdbc:jtds:sqlserver://$serverName/$dbname", "-locations=filesystem:./migrations", "-baselineDescription=baseline", "baseline"
+        $args = "-user=$userName", "-password=$password", "-url=jdbc:jtds:sqlserver://$serverName/$dbname", "-locations=filesystem:$migrationsFolder", "-baselineDescription=baseline", "baseline"
         if($version -ne "") {
             $args += "-baselineVersion=$version"
         }
         & $exec $args
      }
      "migrate" {
-        $args = "-user=$userName", "-password=$password", "-url=jdbc:jtds:sqlserver://$serverName/$dbname", "-locations=filesystem:./migrations", "migrate"
+        $args = "-user=$userName", "-password=$password", "-url=jdbc:jtds:sqlserver://$serverName/$dbname", "-locations=filesystem:$migrationsFolder", "migrate"
         if($version -ne "") {
             $args += "-target=$version"
         }
         & $exec $args
      }
      "validate" {
-        $args = "-user=$userName", "-password=$password", "-url=jdbc:jtds:sqlserver://$serverName/$dbname", "-locations=filesystem:./migrations", "validate"
+        $args = "-user=$userName", "-password=$password", "-url=jdbc:jtds:sqlserver://$serverName/$dbname", "-locations=filesystem:$migrationsFolder", "validate"
         if($version -ne "") {
             $args += "-target=$version"
         }
         & $exec $args
      }
      "repair" {
-        $args = "-user=$userName", "-password=$password", "-url=jdbc:jtds:sqlserver://$serverName/$dbname", "-locations=filesystem:./migrations", "repair"
+        $args = "-user=$userName", "-password=$password", "-url=jdbc:jtds:sqlserver://$serverName/$dbname", "-locations=filesystem:$migrationsFolder", "repair"
         & $exec $args
      }
      default {throw "Unsupported flyWayAction! '$flyWayAction'"}
