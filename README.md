@@ -7,7 +7,7 @@ The tool wraps around SQL Server's sqlpackage (to extract and publish DAC schema
 ## Usage
 
 ```
-.\dbtools.ps1 -serverName localhost -dbname UltraGendaPro -userName usr -password pass -action validate -version 8.0.2
+.\dbtools.ps1 -serverName localhost -dbname MyDatabase -userName usr -password pass -action validate -version 8.0.2
 ```
 
 * serverName: the hostname of the sql server to connect to
