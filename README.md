@@ -4,6 +4,10 @@ A set of powershell scripts designed to facilitate some database versioning work
 
 The tool wraps around SQL Server's sqlpackage (to extract and publish DAC schema packages) and flyway by FuseBox to manage schema versions.
 
+The tool can be used for any database or project, as long as the project provides a consistent `migrations` and `snapshots` folder.
+
+(Flyway)[https://flywaydb.org/] binaries are currently commited, perhaps the 
+
 ## Usage
 
 ```
